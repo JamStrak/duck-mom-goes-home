@@ -80,8 +80,14 @@ Write-Host "commit sha = $commitSha"
 Invoke-GhApi -Method 'PATCH' -Endpoint "repos/$owner/$repo/git/refs/heads/main" -Body @{ sha = $commitSha; force = $true } | Out-Null
 Write-Host "main branch updated OK"
 
-# 7) Upload the deploy workflow via the Contents API (.github is rejected by the raw git tree API)
-$wfPath = Join-Path $root '.github\workflows\deploy.yml'
-$wfB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($wfPath))
-Invoke-GhApi -Method 'PUT' -Endpoint "repos/$owner/$repo/contents/.github/workflows/deploy.yml" -Body @{ message = 'Add deploy workflow'; branch = 'main'; content = $wfB64 } | Out-Null
-Write-Host "workflow uploaded OK"
+# 7) Try uploading the deploy workflow via the Contents API.
+#    NOTE: GitHub blocks creating .github/workflows/* via the REST API (404), so this
+#    step usually warns; the workflow must be added via git push instead (see README).
+try {
+  $wfPath = Join-Path $root '.github\workflows\deploy.yml'
+  $wfB64 = [Convert]::ToBase64String([System.IO.File]::ReadAllBytes($wfPath))
+  Invoke-GhApi -Method 'PUT' -Endpoint "repos/$owner/$repo/contents/.github/workflows/deploy.yml" -Body @{ message = 'Add deploy workflow'; branch = 'main'; content = $wfB64 } | Out-Null
+  Write-Host "workflow uploaded OK"
+} catch {
+  Write-Host "WARN: workflow upload skipped (GitHub blocks API-created workflow files). Add it via git push."
+}

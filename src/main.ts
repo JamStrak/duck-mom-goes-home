@@ -1,5 +1,5 @@
 import "./style.css";
-import type { Progress, Vec2 } from "./types";
+import type { Progress, Vec2, LevelConfig } from "./types";
 import { loadProgress, saveProgress, recordWin, TOTAL_LEVELS } from "./progress";
 import { getLevel, chapterOf, verifyAllLevels, CHAPTERS } from "./levels";
 import { rotateConfig, portraitRuntime } from "./rotator";
@@ -7,11 +7,13 @@ import { Game } from "./game";
 import { Renderer, type RenderState } from "./render";
 import { InputController } from "./input";
 import { computeGridLayout, type ViewLayout } from "./layout";
+import { mountEditor } from "./editor";
+import { getCustomLevel, listCustomLevels } from "./custom-levels";
 
 const app = document.getElementById("app") as HTMLElement;
 
 let progress: Progress = loadProgress();
-let screenKind: "menu" | "game" = "menu";
+let screenKind: "menu" | "game" | "editor" = "menu";
 
 // 当前游戏会话状态
 let currentLevelId = 0;
@@ -25,6 +27,8 @@ let rejectCell: Vec2 | null = null;
 let rejectUntil = 0;
 let lastBoardW = 0;
 let lastBoardH = 0;
+let previewMode = false;
+let previewConfigRef: LevelConfig | null = null;
 
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
@@ -67,6 +71,9 @@ function showMenu(): void {
     el("p", "sub", "铺一条路，接上所有小鸭，一起回家吧"),
     el("div", "menu-stars-total", `⭐ ${totalStars()} / ${TOTAL_LEVELS * 3}`),
   );
+  const editorBtn = el("button", "menu-editor-btn", "🎨 关卡编辑器");
+  editorBtn.addEventListener("click", () => openEditor());
+  hero.append(editorBtn);
   screen.append(hero);
 
   const chapters = el("div", "chapters");
@@ -96,6 +103,24 @@ function showMenu(): void {
         btn.addEventListener("click", () => showGame(lvl));
         if (l === progress.unlocked) btn.classList.add("current");
       }
+      grid.append(btn);
+    }
+    sec.append(grid);
+    chapters.append(sec);
+  }
+
+  // 我的关卡（自定义）
+  const customs = listCustomLevels();
+  if (customs.length) {
+    const sec = el("div", "chapter");
+    const head = el("div", "chapter-head");
+    head.append(el("span", "cname", "我的关卡"), el("span", "crange", `共 ${customs.length} 关`));
+    sec.append(head);
+    const grid = el("div", "level-grid");
+    for (const c of customs) {
+      const btn = el("button", "level-btn");
+      btn.append(el("span", undefined, String(c.levelId)));
+      btn.addEventListener("click", () => showGame(c.levelId));
       grid.append(btn);
     }
     sec.append(grid);
@@ -140,12 +165,33 @@ function buildInfoBar(): HudRefs {
   return { starsTop: el("span", "level-stars"), ducksEl, endEl, endText, toast: el("div", "toast") };
 }
 
+function openEditor(): void {
+  cleanupGame();
+  screenKind = "editor";
+  mountEditor({
+    onExit: () => showMenu(),
+    onTestPlay: (cfg) => playPreview(cfg),
+  });
+}
+
 function showGame(levelId: number): void {
+  const config = getLevel(levelId);
+  const isCustom = getCustomLevel(levelId) !== null;
+  const title = isCustom ? `我的关卡 ${levelId}` : `第${levelId}关 · ${chapterOf(levelId).name}`;
+  mountGame(config, { title, preview: false });
+}
+
+function playPreview(config: LevelConfig): void {
+  mountGame(config, { title: `试玩 · 关卡 ${config.levelId}`, preview: true });
+}
+
+function mountGame(config: LevelConfig, opts: { title: string; preview: boolean }): void {
   cleanupGame();
   screenKind = "game";
-  currentLevelId = levelId;
+  currentLevelId = config.levelId;
+  previewMode = opts.preview;
+  previewConfigRef = config;
 
-  const config = getLevel(levelId);
   orientation = detectOrientation();
   const runtime = orientation === "landscape" ? rotateConfig(config) : portraitRuntime(config);
   game = new Game(runtime);
@@ -157,9 +203,9 @@ function showGame(levelId: number): void {
   // 顶部状态区
   const topbar = el("div", "topbar");
   const left = el("div", "left");
-  const backBtn = iconBtn("←", "选关");
-  backBtn.addEventListener("click", () => showMenu());
-  const title = el("span", "title", `第${levelId}关 · ${chapterOf(levelId).name}`);
+  const backBtn = iconBtn("←", opts.preview ? "编辑器" : "选关");
+  backBtn.addEventListener("click", () => (opts.preview ? openEditor() : showMenu()));
+  const title = el("span", "title", opts.title);
   left.append(backBtn, title);
   const actions = el("div", "actions");
   const hintBtn = iconBtn("💡", "提示");
@@ -346,9 +392,35 @@ function onWin(): void {
   const g = game;
   if (!g) return;
   const stars = g.starCount();
+  if (previewMode) {
+    showPreviewWinOverlay(stars, g.hintUsed);
+    return;
+  }
   progress = recordWin(progress, currentLevelId, stars);
   saveProgress(progress);
   showWinOverlay(stars, currentLevelId, g.hintUsed);
+}
+
+function showPreviewWinOverlay(stars: number, hintUsed: number): void {
+  const overlay = el("div", "win-overlay");
+  const card = el("div", "win-card");
+  card.append(el("div", "big", "✅"));
+  card.append(el("h2", undefined, "试玩通过！"));
+  const starsEl = el("div", "stars");
+  starsEl.innerHTML = "⭐".repeat(stars) + `<span class="dim">${"⭐".repeat(3 - stars)}</span>`;
+  card.append(starsEl);
+  card.append(el("div", "hint-note", `提示次数：${hintUsed}`));
+  const actions = el("div", "win-actions");
+  const replay = el("button", undefined, "再试一次");
+  replay.addEventListener("click", () => {
+    if (previewConfigRef) playPreview(previewConfigRef);
+  });
+  const back = el("button", "secondary", "返回编辑器");
+  back.addEventListener("click", () => openEditor());
+  actions.append(back, replay);
+  card.append(actions);
+  overlay.append(card);
+  app.append(overlay);
 }
 
 function showWinOverlay(stars: number, levelId: number, hintUsed: number): void {
@@ -398,7 +470,8 @@ window.addEventListener("resize", () => {
     const o = detectOrientation();
     if (o !== orientation) {
       // 方向改变：重建关卡（路径清空），进度保留
-      showGame(currentLevelId);
+      if (previewMode && previewConfigRef) playPreview(previewConfigRef);
+      else showGame(currentLevelId);
     }
     // 尺寸改变但方向不变：无需动作，RAF 会重新测量画布
   }, 300);
@@ -416,9 +489,14 @@ if (import.meta.env.DEV) {
 
 showMenu();
 
-// 深链支持：#level=N 直接进入指定关卡（便于测试与分享）
-const hashLevel = /^#level=(\d+)$/.exec(window.location.hash);
-if (hashLevel) {
-  const n = Number(hashLevel[1]);
-  if (Number.isInteger(n) && n >= 1 && n <= TOTAL_LEVELS) showGame(n);
+// 深链支持：#editor 进编辑器；#level=N 直接进入指定关卡
+const hashEditor = /^#editor/.test(window.location.hash);
+if (hashEditor) {
+  openEditor();
+} else {
+  const hashLevel = /^#level=(\d+)$/.exec(window.location.hash);
+  if (hashLevel) {
+    const n = Number(hashLevel[1]);
+    if (Number.isInteger(n) && n >= 1 && n <= TOTAL_LEVELS) showGame(n);
+  }
 }

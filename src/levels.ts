@@ -7,6 +7,7 @@
 import type { LevelConfig, LevelSpec, Vec2, ChapterInfo } from "./types";
 import { mulberry32, randInt, shuffle, pick, type RNG } from "./rng";
 import { rotateConfig, portraitRuntime } from "./rotator";
+import { getCustomLevel } from "./custom-levels";
 
 export const TOTAL_LEVELS = 60;
 
@@ -277,6 +278,9 @@ export function buildAllLevels(): LevelConfig[] {
 }
 
 export function getLevel(levelId: number): LevelConfig {
+  // 自定义关卡优先（覆盖内置或新增 101+）
+  const custom = getCustomLevel(levelId);
+  if (custom) return custom;
   const levels = buildAllLevels();
   const cfg = levels[levelId - 1];
   if (!cfg) throw new Error(`关卡不存在：${levelId}`);
