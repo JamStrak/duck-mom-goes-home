@@ -77,14 +77,11 @@ function drawDuck(
   cx: number,
   cy: number,
   size: number,
-  opts: { mom?: boolean; bob?: number; facing?: "left" | "right" | "up" | "down" } = {},
+  opts: { mom?: boolean; breath?: number; facing?: "left" | "right" } = {},
 ): void {
-  const bob = opts.bob ?? 0;
   const mom = opts.mom ?? false;
+  const breath = opts.breath ?? 0; // -1..1 呼吸相位
   const s = size * 0.92;
-  const dir = opts.facing ?? "right";
-  const ang =
-    dir === "right" ? 0 : dir === "left" ? Math.PI : dir === "down" ? Math.PI / 2 : -Math.PI / 2;
 
   const bodyFill = mom ? C.yellow : "#ffdf7a";
   const bodyShade = mom ? C.yellowDark : "#f2c94c";
@@ -92,15 +89,18 @@ function drawDuck(
   const outlineDark = "#cf8f14";
 
   ctx.save();
+  ctx.translate(cx, cy);
 
-  // 地面投影（不随朝向/摆动旋转）
-  ctx.fillStyle = "rgba(74, 92, 45, 0.14)";
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + s * 0.46, s * 0.36, s * 0.1, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // 左右镜像（始终保持"站在地面"，不旋转）
+  if (opts.facing === "left") ctx.scale(-1, 1);
 
-  ctx.translate(cx, cy + bob);
-  ctx.rotate(ang);
+  // 呼吸感：围绕脚部做缩放挤压（不做上下漂浮）
+  const feetY = s * 0.28;
+  const sx = 1 + breath * 0.03;
+  const sy = 1 - breath * 0.03;
+  ctx.translate(0, feetY);
+  ctx.scale(sx, sy);
+  ctx.translate(0, -feetY);
 
   const headR = mom ? s * 0.2 : s * 0.235;
   const headX = s * 0.24;
@@ -168,25 +168,24 @@ function drawDuck(
     ctx.lineCap = "butt";
   }
 
-  // 喙（圆润三角 + 微笑线）
-  const beakX = headX + headR;
-  const beakY = headY + headR * 0.08;
+  // 鸭嘴（扁平宽喙，非尖嘴）
+  const billCx = headX + headR * 0.7;
+  const billCy = headY + headR * 0.12;
+  const billRx = headR * 0.8;
+  const billRy = headR * 0.4;
   ctx.fillStyle = C.beak;
   ctx.strokeStyle = C.beakDark;
   ctx.lineWidth = Math.max(1, s * 0.03);
   ctx.beginPath();
-  ctx.moveTo(beakX - headR * 0.12, beakY - headR * 0.45);
-  ctx.lineTo(beakX + headR * 0.82, beakY);
-  ctx.lineTo(beakX - headR * 0.12, beakY + headR * 0.45);
-  ctx.quadraticCurveTo(beakX - headR * 0.28, beakY, beakX - headR * 0.12, beakY - headR * 0.45);
-  ctx.closePath();
+  ctx.ellipse(billCx, billCy, billRx, billRy, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
+  // 微笑线
   ctx.strokeStyle = C.beakDark;
-  ctx.lineWidth = Math.max(1, s * 0.025);
+  ctx.lineWidth = Math.max(1, s * 0.022);
   ctx.beginPath();
-  ctx.moveTo(beakX - headR * 0.05, beakY + headR * 0.18);
-  ctx.quadraticCurveTo(beakX + headR * 0.3, beakY + headR * 0.28, beakX + headR * 0.55, beakY + headR * 0.08);
+  ctx.moveTo(billCx - billRx * 0.2, billCy + billRy * 0.15);
+  ctx.quadraticCurveTo(billCx + billRx * 0.25, billCy + billRy * 0.6, billCx + billRx * 0.6, billCy + billRy * 0.1);
   ctx.stroke();
 
   // 眼睛（大眼白 + 瞳孔 + 高光）
@@ -206,26 +205,19 @@ function drawDuck(
   ctx.arc(eyeX + eyeR * 0.32, eyeY - eyeR * 0.32, eyeR * 0.2, 0, Math.PI * 2);
   ctx.fill();
 
-  // 腮红
+  // 腮红（缩小，贴在脸颊内）
   ctx.fillStyle = "rgba(255, 138, 154, 0.5)";
   ctx.beginPath();
-  ctx.ellipse(headX + headR * 0.02, headY + headR * 0.52, headR * 0.28, headR * 0.15, 0, 0, Math.PI * 2);
+  ctx.ellipse(headX + headR * 0.3, headY + headR * 0.42, headR * 0.18, headR * 0.11, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 鸭妈妈红围巾（环 + 飘带）
+  // 鸭妈妈红围巾（细带贴合脖颈，无飘带）
   if (mom) {
     ctx.fillStyle = "#f0506e";
     ctx.strokeStyle = "#d13a58";
     ctx.lineWidth = Math.max(1, s * 0.03);
     ctx.beginPath();
-    ctx.ellipse(headX - headR * 0.15, headY + headR * 0.82, headR * 0.82, headR * 0.42, -0.08, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(headX - headR * 0.5, headY + headR * 0.82);
-    ctx.quadraticCurveTo(headX - headR * 0.9, headY + headR * 1.3, headX - headR * 0.55, headY + headR * 1.45);
-    ctx.lineTo(headX - headR * 0.32, headY + headR * 0.95);
-    ctx.closePath();
+    ctx.ellipse(headX - headR * 0.05, headY + headR * 1.0, headR * 0.6, headR * 0.3, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
   }
@@ -499,8 +491,8 @@ export class Renderer {
     // 未收集的小鸭
     for (const [c, r] of state.uncollectedDucks) {
       const [x, y, s] = this.cellRect(layout, c, r);
-      const bob = Math.sin(t / 300 + c * 1.7 + r * 2.3) * s * 0.03;
-      drawDuck(ctx, x + s / 2, y + s / 2, s * 0.72, { bob, facing: "right" });
+      const breath = Math.sin(t / 350 + c * 1.7 + r * 2.3);
+      drawDuck(ctx, x + s / 2, y + s / 2, s * 0.72, { breath, facing: "right" });
     }
 
     // 鸭妈妈（位于路径末端）与身后队列
@@ -576,16 +568,13 @@ export class Renderer {
     const end = state.path[state.path.length - 1] as Vec2;
     const [ex, ey, s] = this.cellRect(layout, end[0], end[1]);
 
-    // 朝向：朝上一格
-    let facing: "right" | "left" | "up" | "down" = "right";
+    // 朝向：仅左右镜像（上下移动保持原朝向，不旋转）
+    let facing: "left" | "right" = "right";
     if (state.path.length >= 2) {
       const prev = state.path[state.path.length - 2] as Vec2;
       const dx = end[0] - prev[0];
-      const dy = end[1] - prev[1];
       if (dx > 0) facing = "right";
       else if (dx < 0) facing = "left";
-      else if (dy > 0) facing = "down";
-      else facing = "up";
     }
 
     // 身后队列（已收集小鸭，贴紧鸭妈妈）
@@ -595,13 +584,13 @@ export class Renderer {
       if (qi < 0) qi = 0;
       const cell = state.path[qi] as Vec2;
       const [qx, qy, qs] = this.cellRect(layout, cell[0], cell[1]);
-      const bob = Math.sin(t / 300 + i * 1.9) * qs * 0.03;
-      drawDuck(ctx, qx + qs / 2, qy + qs / 2, qs * 0.66, { bob, facing });
+      const breath = Math.sin(t / 350 + i * 1.9);
+      drawDuck(ctx, qx + qs / 2, qy + qs / 2, qs * 0.66, { breath, facing });
     }
 
     // 鸭妈妈
-    const bob = Math.sin(t / 320) * s * 0.02;
-    drawDuck(ctx, ex + s / 2, ey + s / 2, s * 0.96, { mom: true, bob, facing });
+    const breath = Math.sin(t / 380);
+    drawDuck(ctx, ex + s / 2, ey + s / 2, s * 0.96, { mom: true, breath, facing });
   }
 
   private drawReachableHighlight(state: RenderState, layout: ViewLayout, t: number): void {
