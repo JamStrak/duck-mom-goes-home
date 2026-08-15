@@ -81,7 +81,7 @@ function showMenu(): void {
 
   const chapters = el("div", "chapters");
   for (const ch of CHAPTERS) {
-    const sec = el("div", "chapter");
+    const sec = el("div", `chapter c${ch.id}`);
     const head = el("div", "chapter-head");
     head.append(
       el("span", "cname", `第${ch.id}章 · ${ch.name}`),
