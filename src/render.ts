@@ -80,83 +80,154 @@ function drawDuck(
   opts: { mom?: boolean; bob?: number; facing?: "left" | "right" | "up" | "down" } = {},
 ): void {
   const bob = opts.bob ?? 0;
-  const s = size * 0.9;
+  const mom = opts.mom ?? false;
+  const s = size * 0.92;
   const dir = opts.facing ?? "right";
   const ang =
     dir === "right" ? 0 : dir === "left" ? Math.PI : dir === "down" ? Math.PI / 2 : -Math.PI / 2;
 
+  const bodyFill = mom ? C.yellow : "#ffdf7a";
+  const bodyShade = mom ? C.yellowDark : "#f2c94c";
+  const outline = "#e0a11f";
+  const outlineDark = "#cf8f14";
+
   ctx.save();
+
+  // 地面投影（不随朝向/摆动旋转）
+  ctx.fillStyle = "rgba(74, 92, 45, 0.14)";
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + s * 0.46, s * 0.36, s * 0.1, 0, 0, Math.PI * 2);
+  ctx.fill();
+
   ctx.translate(cx, cy + bob);
   ctx.rotate(ang);
 
-  const bodyW = s * 0.5;
-  const bodyH = s * 0.34;
-  const headR = s * 0.2;
-  const mom = opts.mom ?? false;
-  const bodyColor = mom ? C.yellow : "#ffde6b";
-  const bodyDark = mom ? C.yellowDark : "#f6c945";
+  const headR = mom ? s * 0.2 : s * 0.235;
+  const headX = s * 0.24;
+  const headY = -s * 0.24;
 
   // 脚
   ctx.fillStyle = C.beakDark;
   ctx.beginPath();
-  ctx.ellipse(s * 0.02, bodyH * 0.62, s * 0.07, s * 0.05, 0, 0, Math.PI * 2);
-  ctx.ellipse(s * 0.16, bodyH * 0.62, s * 0.07, s * 0.05, 0, 0, Math.PI * 2);
+  ctx.ellipse(-s * 0.02, s * 0.28, s * 0.075, s * 0.05, 0, 0, Math.PI * 2);
+  ctx.ellipse(s * 0.16, s * 0.28, s * 0.075, s * 0.05, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 尾巴
-  ctx.fillStyle = bodyDark;
+  // 尾巴（卷曲）
+  ctx.fillStyle = bodyShade;
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = Math.max(1, s * 0.04);
   ctx.beginPath();
-  ctx.moveTo(-bodyW * 0.5, -bodyH * 0.25);
-  ctx.lineTo(-bodyW * 0.95, -bodyH * 0.55);
-  ctx.lineTo(-bodyW * 0.7, -bodyH * 0.05);
+  ctx.moveTo(-s * 0.34, -s * 0.06);
+  ctx.quadraticCurveTo(-s * 0.56, -s * 0.16, -s * 0.46, -s * 0.02);
+  ctx.quadraticCurveTo(-s * 0.52, s * 0.04, -s * 0.36, s * 0.02);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
 
-  // 身体
-  ctx.fillStyle = bodyColor;
+  // 身体（描边）
+  ctx.fillStyle = bodyFill;
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = Math.max(1.5, s * 0.05);
   ctx.beginPath();
-  ctx.ellipse(0, 0, bodyW, bodyH, 0, 0, Math.PI * 2);
+  ctx.ellipse(0, 0, s * 0.4, s * 0.3, 0, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 
-  // 翅膀
-  ctx.fillStyle = bodyDark;
+  // 翅膀（描边）
+  ctx.fillStyle = bodyShade;
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = Math.max(1, s * 0.035);
   ctx.beginPath();
-  ctx.ellipse(-s * 0.06, s * 0.02, s * 0.16, s * 0.11, -0.3, 0, Math.PI * 2);
+  ctx.ellipse(-s * 0.07, s * 0.06, s * 0.16, s * 0.115, -0.35, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 
-  // 头
-  const hx = bodyW * 0.55;
-  const hy = -bodyH * 0.35;
-  ctx.fillStyle = bodyColor;
+  // 头（描边）
+  ctx.fillStyle = bodyFill;
+  ctx.strokeStyle = outline;
+  ctx.lineWidth = Math.max(1.5, s * 0.05);
   ctx.beginPath();
-  ctx.arc(hx, hy, headR, 0, Math.PI * 2);
+  ctx.arc(headX, headY, headR, 0, Math.PI * 2);
   ctx.fill();
+  ctx.stroke();
 
-  // 喙
+  // 小鸭呆毛
+  if (!mom) {
+    ctx.strokeStyle = outlineDark;
+    ctx.lineWidth = Math.max(1, s * 0.045);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(headX - headR * 0.15, headY - headR * 0.92);
+    ctx.quadraticCurveTo(headX - headR * 0.4, headY - headR * 1.5, headX - headR * 0.05, headY - headR * 1.3);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(headX + headR * 0.3, headY - headR * 0.95);
+    ctx.quadraticCurveTo(headX + headR * 0.1, headY - headR * 1.5, headX + headR * 0.5, headY - headR * 1.25);
+    ctx.stroke();
+    ctx.lineCap = "butt";
+  }
+
+  // 喙（圆润三角 + 微笑线）
+  const beakX = headX + headR;
+  const beakY = headY + headR * 0.08;
   ctx.fillStyle = C.beak;
+  ctx.strokeStyle = C.beakDark;
+  ctx.lineWidth = Math.max(1, s * 0.03);
   ctx.beginPath();
-  ctx.moveTo(hx + headR * 0.75, hy - headR * 0.25);
-  ctx.lineTo(hx + headR * 1.7, hy + headR * 0.1);
-  ctx.lineTo(hx + headR * 0.75, hy + headR * 0.45);
+  ctx.moveTo(beakX - headR * 0.12, beakY - headR * 0.45);
+  ctx.lineTo(beakX + headR * 0.82, beakY);
+  ctx.lineTo(beakX - headR * 0.12, beakY + headR * 0.45);
+  ctx.quadraticCurveTo(beakX - headR * 0.28, beakY, beakX - headR * 0.12, beakY - headR * 0.45);
   ctx.closePath();
   ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle = C.beakDark;
+  ctx.lineWidth = Math.max(1, s * 0.025);
+  ctx.beginPath();
+  ctx.moveTo(beakX - headR * 0.05, beakY + headR * 0.18);
+  ctx.quadraticCurveTo(beakX + headR * 0.3, beakY + headR * 0.28, beakX + headR * 0.55, beakY + headR * 0.08);
+  ctx.stroke();
 
-  // 眼睛
+  // 眼睛（大眼白 + 瞳孔 + 高光）
+  const eyeX = headX + headR * 0.42;
+  const eyeY = headY - headR * 0.22;
+  const eyeR = mom ? headR * 0.36 : headR * 0.4;
+  ctx.fillStyle = C.white;
+  ctx.beginPath();
+  ctx.arc(eyeX, eyeY, eyeR, 0, Math.PI * 2);
+  ctx.fill();
   ctx.fillStyle = C.ink;
   ctx.beginPath();
-  ctx.arc(hx + headR * 0.35, hy - headR * 0.2, Math.max(1.2, s * 0.045), 0, Math.PI * 2);
+  ctx.arc(eyeX + eyeR * 0.18, eyeY + eyeR * 0.04, eyeR * 0.55, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = C.white;
   ctx.beginPath();
-  ctx.arc(hx + headR * 0.42, hy - headR * 0.26, Math.max(0.6, s * 0.016), 0, Math.PI * 2);
+  ctx.arc(eyeX + eyeR * 0.32, eyeY - eyeR * 0.32, eyeR * 0.2, 0, Math.PI * 2);
   ctx.fill();
 
-  // 鸭妈妈的红围巾
+  // 腮红
+  ctx.fillStyle = "rgba(255, 138, 154, 0.5)";
+  ctx.beginPath();
+  ctx.ellipse(headX + headR * 0.02, headY + headR * 0.52, headR * 0.28, headR * 0.15, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 鸭妈妈红围巾（环 + 飘带）
   if (mom) {
     ctx.fillStyle = "#f0506e";
+    ctx.strokeStyle = "#d13a58";
+    ctx.lineWidth = Math.max(1, s * 0.03);
     ctx.beginPath();
-    ctx.ellipse(hx - headR * 0.15, hy + headR * 0.7, headR * 0.75, headR * 0.34, 0, 0, Math.PI * 2);
+    ctx.ellipse(headX - headR * 0.15, headY + headR * 0.82, headR * 0.82, headR * 0.42, -0.08, 0, Math.PI * 2);
     ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(headX - headR * 0.5, headY + headR * 0.82);
+    ctx.quadraticCurveTo(headX - headR * 0.9, headY + headR * 1.3, headX - headR * 0.55, headY + headR * 1.45);
+    ctx.lineTo(headX - headR * 0.32, headY + headR * 0.95);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   }
 
   ctx.restore();
