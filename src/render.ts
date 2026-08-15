@@ -287,6 +287,26 @@ function drawHouse(
     ctx.stroke();
   }
 
+  // 烟囱 + 炊烟（解锁后才有烟）
+  const chimX = x + s * 0.7;
+  ctx.fillStyle = unlocked ? "#d9864f" : "#bcb6aa";
+  ctx.strokeStyle = unlocked ? "#b9683a" : "#a49f94";
+  ctx.lineWidth = Math.max(1, s * 0.02);
+  roundRect(ctx, chimX, y - s * 0.24, s * 0.16, s * 0.3, s * 0.03);
+  ctx.fill();
+  ctx.stroke();
+  if (unlocked) {
+    for (let p = 0; p < 3; p++) {
+      const ph = (t / 1500 + p * 0.33) % 1;
+      ctx.globalAlpha = 0.5 * (1 - ph);
+      ctx.fillStyle = "#f2f2f2";
+      ctx.beginPath();
+      ctx.arc(chimX + s * 0.08 + (p - 1) * s * 0.05, y - s * 0.26 - s * 0.3 * ph, s * (0.045 + 0.05 * ph), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 
@@ -318,6 +338,11 @@ function drawObstacle(
     ctx.strokeStyle = C.rockEdge;
     ctx.lineWidth = Math.max(1, s * 0.04);
     ctx.stroke();
+    // 高光
+    ctx.fillStyle = "rgba(255,255,255,0.22)";
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.15, -s * 0.12, s * 0.14, s * 0.09, -0.4, 0, Math.PI * 2);
+    ctx.fill();
   } else if (kind === 1) {
     // 水坑
     ctx.fillStyle = C.water;
@@ -334,6 +359,14 @@ function drawObstacle(
     ctx.beginPath();
     ctx.ellipse(0, 0, s * (0.12 + 0.2 * rp), s * (0.09 + 0.15 * rp), 0, 0, Math.PI * 2);
     ctx.stroke();
+    // 气泡
+    ctx.fillStyle = "rgba(255,255,255,0.5)";
+    for (let b = 0; b < 2; b++) {
+      const bp = (t / 1200 + b * 0.5) % 1;
+      ctx.beginPath();
+      ctx.arc(s * (0.12 - 0.22 * b), s * (0.18 - 0.28 * bp), s * (0.03 + 0.025 * bp), 0, Math.PI * 2);
+      ctx.fill();
+    }
   } else {
     // 树桩
     ctx.fillStyle = C.stump;
@@ -350,6 +383,18 @@ function drawObstacle(
     ctx.strokeStyle = C.stumpEdge;
     ctx.lineWidth = Math.max(1, s * 0.03);
     ctx.stroke();
+    // 新芽
+    ctx.strokeStyle = "#5da23a";
+    ctx.lineWidth = Math.max(1, s * 0.05);
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 0.22);
+    ctx.quadraticCurveTo(0, -s * 0.38, -s * 0.08, -s * 0.4);
+    ctx.stroke();
+    ctx.fillStyle = "#7ed957";
+    ctx.beginPath();
+    ctx.ellipse(-s * 0.1, -s * 0.41, s * 0.09, s * 0.05, -0.5, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
@@ -395,12 +440,90 @@ function drawDecoration(
   ctx.restore();
 }
 
+// ===== 轻量粒子系统 =====
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  size: number;
+  color: string;
+  kind: "dot" | "sparkle" | "confetti";
+  rot: number;
+  vr: number;
+}
+
+const particles: Particle[] = [];
+
+export type BurstKind = "step" | "collect" | "win";
+
+/** 在屏幕坐标 (x,y) 处喷发一组粒子 */
+export function spawnBurst(kind: BurstKind, x: number, y: number, cell: number): void {
+  if (kind === "step") {
+    for (let i = 0; i < 4; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = cell * (0.02 + Math.random() * 0.03);
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - cell * 0.015,
+        life: 0, maxLife: 260 + Math.random() * 160,
+        size: cell * (0.03 + Math.random() * 0.03),
+        color: "rgba(200, 190, 150, 0.8)", kind: "dot", rot: 0, vr: 0,
+      });
+    }
+  } else if (kind === "collect") {
+    const colors = ["#ffd23f", "#ffb703", "#ff9f1c", "#fff3b0"];
+    for (let i = 0; i < 9; i++) {
+      const a = (i / 9) * Math.PI * 2 + Math.random() * 0.5;
+      const sp = cell * (0.04 + Math.random() * 0.05);
+      particles.push({
+        x, y,
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp - cell * 0.03,
+        life: 0, maxLife: 460 + Math.random() * 240,
+        size: cell * (0.05 + Math.random() * 0.04),
+        color: colors[i % colors.length] as string, kind: "sparkle",
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.25,
+      });
+    }
+  } else {
+    const colors = ["#ff5d8f", "#ffb703", "#3bc0ff", "#7ed957", "#c77dff", "#ff8c42"];
+    for (let i = 0; i < 30; i++) {
+      particles.push({
+        x: x + (Math.random() - 0.5) * cell * 1.6,
+        y: y - cell * 0.5 - Math.random() * cell * 0.8,
+        vx: (Math.random() - 0.5) * cell * 0.07,
+        vy: cell * (0.02 + Math.random() * 0.05),
+        life: 0, maxLife: 1100 + Math.random() * 700,
+        size: cell * (0.04 + Math.random() * 0.05),
+        color: colors[i % colors.length] as string, kind: "confetti",
+        rot: Math.random() * Math.PI, vr: (Math.random() - 0.5) * 0.3,
+      });
+    }
+  }
+  if (particles.length > 400) particles.splice(0, particles.length - 400);
+}
+
+function drawSparkle(ctx: CanvasRenderingContext2D, r: number): void {
+  ctx.beginPath();
+  ctx.moveTo(0, -r);
+  ctx.quadraticCurveTo(0, 0, r, 0);
+  ctx.quadraticCurveTo(0, 0, 0, r);
+  ctx.quadraticCurveTo(0, 0, -r, 0);
+  ctx.quadraticCurveTo(0, 0, 0, -r);
+  ctx.closePath();
+}
+
 export class Renderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private dpr = 1;
   private cssW = 0;
   private cssH = 0;
+  private lastT = 0;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -427,6 +550,8 @@ export class Renderer {
 
   draw(state: RenderState, layout: ViewLayout, t: number): void {
     const ctx = this.ctx;
+    const dt = this.lastT ? Math.min(40, t - this.lastT) : 16;
+    this.lastT = t;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.cssW, this.cssH);
 
@@ -524,6 +649,46 @@ export class Renderer {
       ctx.fillStyle = `rgba(244, 92, 82, ${(0.4 * (1 - fade)).toFixed(3)})`;
       roundRect(ctx, x, y, s, s, s * 0.12);
       ctx.fill();
+    }
+
+    // 粒子（最上层）
+    this.drawParticles(dt);
+  }
+
+  private drawParticles(dt: number): void {
+    const ctx = this.ctx;
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i] as Particle;
+      p.life += dt;
+      if (p.life >= p.maxLife) {
+        particles.splice(i, 1);
+        continue;
+      }
+      const k = p.life / p.maxLife;
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += 0.0004 * dt;
+      p.rot += p.vr * dt;
+
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, 1 - k);
+      ctx.translate(p.x, p.y);
+      if (p.kind === "sparkle") {
+        ctx.fillStyle = p.color;
+        ctx.rotate(p.rot);
+        drawSparkle(ctx, p.size);
+        ctx.fill();
+      } else if (p.kind === "confetti") {
+        ctx.fillStyle = p.color;
+        ctx.rotate(p.rot);
+        ctx.fillRect(-p.size / 2, -p.size / 4, p.size, p.size / 2);
+      } else {
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
   }
 

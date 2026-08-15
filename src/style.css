@@ -614,3 +614,34 @@ body {
   color: #4b8a5c;
   min-height: 18px;
 }
+
+/* ===== 质感统一打磨 ===== */
+.topbar {
+  border-radius: 0 0 18px 18px;
+}
+.bottombar {
+  border-radius: 18px 18px 0 0;
+}
+.sideinfo {
+  border-radius: 18px 0 0 18px;
+}
+.icon-btn,
+.editor-action,
+.editor-tool,
+.menu-editor-btn {
+  transition: transform 0.07s ease, box-shadow 0.07s ease;
+}
+.icon-btn:active,
+.editor-action:active,
+.editor-tool:active,
+.menu-editor-btn:active {
+  transform: translateY(2px) scale(0.97);
+}
+.level-btn {
+  border-radius: 18px;
+  transition: transform 0.08s ease, box-shadow 0.08s ease;
+}
+.level-btn:not(.locked):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 rgba(80, 120, 80, 0.25);
+}

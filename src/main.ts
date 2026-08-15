@@ -4,7 +4,7 @@ import { loadProgress, saveProgress, recordWin, TOTAL_LEVELS } from "./progress"
 import { getLevel, chapterOf, verifyAllLevels, CHAPTERS } from "./levels";
 import { rotateConfig, portraitRuntime } from "./rotator";
 import { Game } from "./game";
-import { Renderer, type RenderState } from "./render";
+import { Renderer, spawnBurst, type RenderState } from "./render";
 import { InputController } from "./input";
 import { computeGridLayout, type ViewLayout } from "./layout";
 import { mountEditor } from "./editor";
@@ -302,6 +302,13 @@ function buildRenderState(): RenderState {
   };
 }
 
+function burstAtCell(cell: Vec2, kind: "step" | "collect" | "win"): void {
+  if (!layout) return;
+  const x = layout.originX + cell[0] * layout.cell + layout.cell / 2;
+  const y = layout.originY + cell[1] * layout.cell + layout.cell / 2;
+  spawnBurst(kind, x, y, layout.cell);
+}
+
 function handleCell(cell: Vec2): void {
   const g = game;
   if (!g || g.isWon()) return;
@@ -324,11 +331,14 @@ function handleCell(cell: Vec2): void {
     rejectUntil = performance.now() + 260;
     updateHud();
   } else if (res.type === "extended") {
-    audio.play(g.isDuck(cell[0], cell[1]) ? "collect" : "step");
+    const isDuck = g.isDuck(cell[0], cell[1]);
+    audio.play(isDuck ? "collect" : "step");
+    burstAtCell(cell, isDuck ? "collect" : "step");
     clearToast();
     updateHud();
   } else if (res.type === "won") {
     audio.play("win");
+    burstAtCell(cell, "win");
     updateHud();
     onWin();
   }
