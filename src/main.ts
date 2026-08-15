@@ -9,6 +9,7 @@ import { InputController } from "./input";
 import { computeGridLayout, type ViewLayout } from "./layout";
 import { mountEditor } from "./editor";
 import { getCustomLevel, listCustomLevels } from "./custom-levels";
+import { audio } from "./audio";
 
 const app = document.getElementById("app") as HTMLElement;
 
@@ -208,11 +209,22 @@ function mountGame(config: LevelConfig, opts: { title: string; preview: boolean 
   const title = el("span", "title", opts.title);
   left.append(backBtn, title);
   const actions = el("div", "actions");
+  const muteBtn = el("button", "icon-btn");
+  const updateMuteBtn = () => {
+    muteBtn.textContent = audio.muted ? "🔇" : "🔊";
+    muteBtn.title = audio.muted ? "开启音效" : "静音";
+  };
+  updateMuteBtn();
+  muteBtn.addEventListener("click", () => {
+    audio.unlock();
+    audio.toggleMute();
+    updateMuteBtn();
+  });
   const hintBtn = iconBtn("💡", "提示");
   const resetBtn = iconBtn("🔄", "清空");
   hintBtn.addEventListener("click", () => onHint());
   resetBtn.addEventListener("click", () => onReset());
-  actions.append(hintBtn, resetBtn);
+  actions.append(muteBtn, hintBtn, resetBtn);
   topbar.append(left, actions);
 
   // 信息区
@@ -297,6 +309,7 @@ function handleCell(cell: Vec2): void {
   // 点击已铺格 → 截断（撤销）；点击起点格等效整体重置
   if (g.isPathCell(cell[0], cell[1])) {
     g.truncateAt(cell);
+    audio.play("undo");
     clearToast();
     updateHud();
     return;
@@ -304,15 +317,18 @@ function handleCell(cell: Vec2): void {
 
   const res = g.extendTo(cell);
   if (res.type === "rejected") {
+    audio.play("reject");
     if (res.reason === "duck-missing") showToast("还有小鸭没接上 🐤");
     else if (res.reason === "obstacle") showToast("这里过不去哦 🚧");
     rejectCell = cell;
     rejectUntil = performance.now() + 260;
     updateHud();
   } else if (res.type === "extended") {
+    audio.play(g.isDuck(cell[0], cell[1]) ? "collect" : "step");
     clearToast();
     updateHud();
   } else if (res.type === "won") {
+    audio.play("win");
     updateHud();
     onWin();
   }
@@ -323,6 +339,7 @@ function onHint(): void {
   if (!g || g.isWon()) return;
   const next = g.requestHint();
   if (next) {
+    audio.play("hint");
     clearToast();
     showToast("往这边走 💡");
     updateHud();
@@ -335,6 +352,7 @@ function onReset(): void {
   const g = game;
   if (!g) return;
   g.reset();
+  audio.play("reset");
   clearToast();
   updateHud();
 }
@@ -486,6 +504,15 @@ if (import.meta.env.DEV) {
       (v.failed.length ? `，失败：${v.failed.join(",")}` : " ✅"),
   );
 }
+
+// iOS 自动播放限制：首次用户手势时解锁 AudioContext
+window.addEventListener(
+  "pointerdown",
+  () => {
+    audio.unlock();
+  },
+  { once: true },
+);
 
 showMenu();
 
