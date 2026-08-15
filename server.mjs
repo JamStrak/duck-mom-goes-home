@@ -4,11 +4,12 @@
 // 无第三方依赖，仅用 Node 内置模块。缓存策略：入口 HTML no-store，哈希资源 immutable。
 
 import { createServer } from 'node:http';
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, statSync, writeFileSync, renameSync } from 'node:fs';
 import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const distDir = resolve(fileURLToPath(new URL('.', import.meta.url)), 'dist');
+const rootDir = resolve(distDir, '..');
 const port = Number(process.env.GAME_PORT || process.argv[2] || 5175);
 const host = process.env.GAME_HOST || '127.0.0.1';
 
@@ -40,6 +41,38 @@ function resolveSafe(urlPath) {
 
 const server = createServer((req, res) => {
   const method = req.method || 'GET';
+
+  // 本地关卡写入：POST /api/save-levels → 写 src/custom-levels.json（仅限本机回环地址）
+  if (method === 'POST' && req.url === '/api/save-levels') {
+    const remote = req.socket.remoteAddress || '';
+    if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') {
+      res.writeHead(403);
+      res.end('Forbidden');
+      return;
+    }
+    let body = '';
+    req.on('data', (c) => {
+      body += c;
+      if (body.length > 2_000_000) req.destroy();
+    });
+    req.on('end', () => {
+      try {
+        const parsed = JSON.parse(body);
+        if (!Array.isArray(parsed)) throw new Error('expected JSON array');
+        const target = join(rootDir, 'src', 'custom-levels.json');
+        const tmp = target + '.tmp';
+        writeFileSync(tmp, JSON.stringify(parsed, null, 2));
+        renameSync(tmp, target);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: true, count: parsed.length }));
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: String(e) }));
+      }
+    });
+    return;
+  }
+
   if (method !== 'GET' && method !== 'HEAD') {
     res.writeHead(405);
     res.end();

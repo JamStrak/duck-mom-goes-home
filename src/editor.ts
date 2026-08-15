@@ -12,6 +12,7 @@ import {
   nextCustomLevelId,
   listCustomLevels,
   importCustomLevels,
+  exportCustomLevels,
 } from "./custom-levels";
 
 type Tool = "start" | "end" | "duck" | "obstacle" | "erase";
@@ -171,12 +172,14 @@ export function mountEditor(opts: EditorOpts): void {
   const footer = el("div", "editor-footer");
   const btnValidate = el("button", "editor-action", "✅ 验证可解");
   const btnTest = el("button", "editor-action", "▶ 试玩");
-  const btnSave = el("button", "editor-action", "💾 保存");
-  const btnExport = el("button", "editor-action", "📤 导出JSON");
+  const btnSave = el("button", "editor-action", "💾 存浏览器");
+  const btnSaveProject = el("button", "editor-action", "📁 存到项目");
+  const btnExport = el("button", "editor-action", "📤 导出当前关");
+  const btnExportAll = el("button", "editor-action", "📦 导出全部");
   const btnImport = el("button", "editor-action", "📥 导入JSON");
   const btnClear = el("button", "editor-action secondary", "🧹 清空");
   const status = el("span", "editor-status", "");
-  footer.append(btnValidate, btnTest, btnSave, btnExport, btnImport, btnClear);
+  footer.append(btnValidate, btnTest, btnSave, btnSaveProject, btnExport, btnExportAll, btnImport, btnClear);
   screen.append(footer, status);
 
   // —— 交互逻辑 ——
@@ -317,7 +320,7 @@ export function mountEditor(opts: EditorOpts): void {
     putCustomLevel(cfg);
     draft = cfg;
     state.isNew = false;
-    status.textContent = `💾 已保存「我的关卡 ${cfg.levelId}」（在菜单里可见）`;
+    status.textContent = `💾 已存到浏览器。要写入项目文件请点「📁 存到项目」`;
     // 刷新加载下拉
     refreshLoadOptions();
   }
@@ -348,7 +351,58 @@ export function mountEditor(opts: EditorOpts): void {
       // ignore
     }
     download(json, `level-${cfg.levelId}.json`);
-    status.textContent = "📤 已导出 JSON（并复制到剪贴板）";
+    status.textContent = "📤 已导出当前关 JSON（并复制到剪贴板）";
+  }
+
+  function exportAllJson(): void {
+    const all = listCustomLevels();
+    if (!all.length) {
+      status.textContent = "⚠️ 还没有保存过任何关卡";
+      return;
+    }
+    const json = exportCustomLevels();
+    try {
+      void navigator.clipboard?.writeText(json);
+    } catch {
+      // ignore
+    }
+    download(json, "custom-levels.json");
+    status.textContent = `📦 已导出 ${all.length} 个关卡为 custom-levels.json（并复制到剪贴板）`;
+  }
+
+  async function saveToProject(): Promise<void> {
+    const cfg = buildConfig();
+    if (!cfg) {
+      status.textContent = "⚠️ 请先放置起点和终点";
+      return;
+    }
+    const sol = computeSolution(cfg);
+    if (!sol) {
+      status.textContent = "❌ 不可解，无法保存";
+      return;
+    }
+    cfg.solution = sol;
+    putCustomLevel(cfg);
+    draft = cfg;
+    state.isNew = false;
+    refreshLoadOptions();
+
+    const all = listCustomLevels();
+    try {
+      const res = await fetch("/api/save-levels", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(all),
+      });
+      const data = (await res.json()) as { ok?: boolean; count?: number; error?: string };
+      if (data.ok) {
+        status.textContent = `📁 已写入项目 src/custom-levels.json（${data.count} 关）。现在双击「同步到GitHub.cmd」即可上线。`;
+      } else {
+        status.textContent = `⚠️ 写入失败：${data.error ?? "未知"}`;
+      }
+    } catch {
+      status.textContent = "⚠️ 本功能仅在本机运行（一键启动）时可用；线上请用「📦 导出全部」把文件发我";
+    }
   }
 
   function importJson(): void {
@@ -383,7 +437,9 @@ export function mountEditor(opts: EditorOpts): void {
 
   btnValidate.addEventListener("click", validate);
   btnSave.addEventListener("click", save);
+  btnSaveProject.addEventListener("click", saveToProject);
   btnExport.addEventListener("click", exportJson);
+  btnExportAll.addEventListener("click", exportAllJson);
   btnImport.addEventListener("click", importJson);
   btnClear.addEventListener("click", clearAll);
   btnTest.addEventListener("click", () => {
