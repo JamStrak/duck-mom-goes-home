@@ -434,20 +434,24 @@ function onWin(): void {
 function showPreviewWinOverlay(stars: number, hintUsed: number): void {
   const overlay = el("div", "win-overlay");
   const card = el("div", "win-card");
-  card.append(el("div", "big", "✅"));
+  card.append(el("div", "win-big", "✅"));
   card.append(el("h2", undefined, "试玩通过！"));
-  const starsEl = el("div", "stars");
-  starsEl.innerHTML = "⭐".repeat(stars) + `<span class="dim">${"⭐".repeat(3 - stars)}</span>`;
+
+  const starsEl = el("div", "win-stars");
+  for (let i = 0; i < 3; i++) starsEl.append(el("span", i < stars ? "star on" : "star off", "★"));
   card.append(starsEl);
-  card.append(el("div", "hint-note", `提示次数：${hintUsed}`));
+  card.append(el("div", "win-note", `提示次数：${hintUsed}`));
+
   const actions = el("div", "win-actions");
-  const replay = el("button", undefined, "再试一次");
+  const replay = el("button", "win-btn win-btn--primary");
+  replay.append(el("span", undefined, "🔄"), el("span", undefined, "再试一次"));
   replay.addEventListener("click", () => {
     if (previewConfigRef) playPreview(previewConfigRef);
   });
-  const back = el("button", "secondary", "返回编辑器");
+  const back = el("button", "win-btn");
+  back.append(el("span", undefined, "🏠"), el("span", undefined, "返回编辑器"));
   back.addEventListener("click", () => openEditor());
-  actions.append(back, replay);
+  actions.append(replay, back);
   card.append(actions);
   overlay.append(card);
   app.append(overlay);
@@ -456,14 +460,12 @@ function showPreviewWinOverlay(stars: number, hintUsed: number): void {
 function showWinOverlay(stars: number, levelId: number, hintUsed: number): void {
   const overlay = el("div", "win-overlay");
   const card = el("div", "win-card");
-  card.append(el("div", "big", "🏠"));
 
-  const h2 = el("h2", undefined, "通关啦！");
-  card.append(h2);
+  card.append(el("div", "win-big", "🏠"));
+  card.append(el("h2", undefined, "通关啦！"));
 
-  const starsEl = el("div", "stars");
-  starsEl.innerHTML =
-    "⭐".repeat(stars) + `<span class="dim">${"⭐".repeat(3 - stars)}</span>`;
+  const starsEl = el("div", "win-stars");
+  for (let i = 0; i < 3; i++) starsEl.append(el("span", i < stars ? "star on" : "star off", "★"));
   card.append(starsEl);
 
   const note =
@@ -472,20 +474,27 @@ function showWinOverlay(stars: number, levelId: number, hintUsed: number): void 
       : hintUsed === 1
         ? "用了 1 次提示"
         : `用了 ${hintUsed} 次提示`;
-  card.append(el("div", "hint-note", note));
+  card.append(el("div", "win-note", note));
 
   const actions = el("div", "win-actions");
-  const replay = el("button", undefined, "再玩一次");
-  replay.addEventListener("click", () => showGame(levelId));
-  const menuBtn = el("button", "secondary", "选关");
-  menuBtn.addEventListener("click", () => showMenu());
-  actions.append(menuBtn, replay);
-
+  // 主行动：下一关（大按钮 + 右箭头）
   if (levelId < TOTAL_LEVELS) {
-    const next = el("button", undefined, "下一关");
+    const next = el("button", "win-btn win-btn--primary");
+    next.append(el("span", undefined, "下一关"), el("span", "win-btn--arrow", "➜"));
     next.addEventListener("click", () => showGame(levelId + 1));
     actions.append(next);
   }
+  // 次要行动：再玩一次 + 选关
+  const row = el("div", "win-actions-row");
+  const replay = el("button", "win-btn");
+  replay.append(el("span", undefined, "🔄"), el("span", undefined, "再玩一次"));
+  replay.addEventListener("click", () => showGame(levelId));
+  const menuBtn = el("button", "win-btn");
+  menuBtn.append(el("span", undefined, "🏠"), el("span", undefined, "选关"));
+  menuBtn.addEventListener("click", () => showMenu());
+  row.append(replay, menuBtn);
+  actions.append(row);
+
   card.append(actions);
   overlay.append(card);
   app.append(overlay);
