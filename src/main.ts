@@ -10,6 +10,7 @@ import { computeGridLayout, type ViewLayout } from "./layout";
 import { mountEditor } from "./editor";
 import { getCustomLevel, listCustomLevels } from "./custom-levels";
 import { audio } from "./audio";
+import { VERSION } from "./version";
 
 const app = document.getElementById("app") as HTMLElement;
 
@@ -71,6 +72,7 @@ function showMenu(): void {
     el("h1", undefined, "鸭妈妈回家"),
     el("p", "sub", "铺一条路，接上所有小鸭，一起回家吧"),
     el("div", "menu-stars-total", `⭐ ${totalStars()} / ${TOTAL_LEVELS * 3}`),
+    el("div", "menu-version", `v${VERSION} · build ${__GIT_HASH__}`),
   );
   const editorBtn = el("button", "menu-editor-btn", "🎨 关卡编辑器");
   editorBtn.addEventListener("click", () => openEditor());
@@ -520,6 +522,7 @@ window.addEventListener(
   "pointerdown",
   () => {
     audio.unlock();
+    audio.startBgm();
   },
   { once: true },
 );

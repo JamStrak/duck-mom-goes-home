@@ -15,6 +15,8 @@ const MUTE_KEY = "duck_mom_muted";
 class AudioManager {
   private ctx: AudioContext | null = null;
   private _muted = false;
+  private bgmTimer: ReturnType<typeof setInterval> | null = null;
+  private bgmStep = 0;
 
   constructor() {
     try {
@@ -54,8 +56,45 @@ class AudioManager {
     } catch {
       // ignore
     }
+    if (this._muted) this.stopBgm();
+    else this.startBgm();
     return this._muted;
   }
+
+  /** 开始循环播放轻柔背景音乐（程序化合成，零体积） */
+  startBgm(): void {
+    if (this._muted || this.bgmTimer !== null) return;
+    if (!this.ctx) this.unlock();
+    if (!this.ctx) return;
+    const stepMs = 360;
+    const tick = (): void => {
+      if (!this.ctx || this._muted) return;
+      const m = AudioManager.MELODY[this.bgmStep % AudioManager.MELODY.length] as number;
+      const b = AudioManager.BASS[this.bgmStep % AudioManager.BASS.length] as number;
+      if (m > 0) this.tone(m, 0, 0.5, "triangle", 0.055);
+      if (b > 0) this.tone(b, 0, 0.72, "sine", 0.045);
+      this.bgmStep++;
+    };
+    tick();
+    this.bgmTimer = setInterval(tick, stepMs);
+  }
+
+  stopBgm(): void {
+    if (this.bgmTimer !== null) {
+      clearInterval(this.bgmTimer);
+      this.bgmTimer = null;
+    }
+  }
+
+  // C 大调五声音阶轻柔旋律（0 = 休止）
+  private static MELODY: number[] = [
+    523.25, 0, 659.25, 0, 783.99, 0, 659.25, 0,
+    587.33, 0, 698.46, 0, 880.0, 0, 698.46, 0,
+  ];
+  private static BASS: number[] = [
+    130.81, 0, 0, 0, 196.0, 0, 0, 0,
+    174.61, 0, 0, 0, 196.0, 0, 0, 0,
+  ];
 
   private tone(
     freq: number,
