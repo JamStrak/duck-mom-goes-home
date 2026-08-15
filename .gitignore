@@ -1,0 +1,9 @@
+node_modules/
+dist/
+release/
+.runtime/
+docs/
+.deploy/
+scripts/_verify.mjs
+*.log
+.DS_Store
